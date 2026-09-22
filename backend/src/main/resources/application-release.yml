@@ -1,0 +1,14 @@
+spring:
+  datasource:
+    url: jdbc:mysql://mysql:3306/sourcenote
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+qdrant:
+  host: qdrant
+  port: 6334
+
+app:
+  storage:
+    upload-dir: /data/uploads
