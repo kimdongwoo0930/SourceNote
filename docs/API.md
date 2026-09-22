@@ -11,6 +11,8 @@ springdoc-openapi가 컨트롤러·DTO에서 OpenAPI 3 스펙을 생성합니다
 | 로컬 | http://localhost:8080/swagger-ui.html | http://localhost:8080/v3/api-docs |
 | release | `https://<도메인>/swagger-ui.html` | `https://<도메인>/v3/api-docs` |
 
+경로는 `application.yml`의 `springdoc.api-docs.path`·`springdoc.swagger-ui.path` 설정값입니다.
+
 프론트엔드는 바이브코딩으로 별도 진행되므로, **엔드포인트와 DTO를 먼저 확정하고 코드를 시작하는 API-first** 방식을 씁니다. 이 스펙이 프론트-백엔드 계약입니다.
 
 ## 인증

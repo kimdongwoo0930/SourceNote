@@ -55,18 +55,19 @@ Browser
 Cloudflare  (Proxied, HTTPS 종단)
   │ Origin Certificate / SSL 모드 Full(strict)
   ▼
-┌───────────── Oracle Cloud A1.Flex (2 OCPU · 12GB) ─────────────┐
-│                                                                │
+┌───────────── Oracle Cloud A1.Flex (2 OCPU · 12GB) ──────────────┐
+│                                                                 │
 │  Nginx  :80 :443   ← 유일한 외부 노출                           │
-│    ├── /              → frontend  (Next.js)                    │
-│    └── /api, /oauth2  → backend   (Spring Boot)                │
-│                            ├── MySQL   메타데이터              │
-│                            ├── Qdrant  study_chunks            │
-│                            └── Redis   질문·시맨틱 캐시         │
-│                                                                │
+│    ├── /              → frontend  (Next.js)                     │
+│    └── /api, /oauth2  → backend   (Spring Boot)                 │
+│                            ├── MySQL   메타데이터               │
+│                            ├── Qdrant  study_chunks             │
+│                            └── Redis   질문·시맨틱 캐시 (예정)  │
+│                                                                 │
 │  frontend·backend·mysql·qdrant·redis = Docker 내부망 전용       │
-│  (호스트 포트 미노출 → 방화벽 규칙 자체가 불필요)                │
-└────────────────────────────────────────────────────────────────┘
+│  (호스트 포트 미노출 → 방화벽 규칙 자체가 불필요)               │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
        │ 외부 API
        ├── OpenAI Embeddings   개발자 고정 키
        ├── Claude / GPT Chat   사용자 API 키 (BYOK)
@@ -88,12 +89,12 @@ Controller → Service → RetrievalAugmentationAdvisor (Qdrant 검색 + 프롬�
 
 | 영역 | 사용 기술 | 비고 |
 |---|---|---|
-| 언어 | Java 21, TypeScript | |
-| 백엔드 | Spring Boot, Spring AI, Spring Security | Spring AI의 `RetrievalAugmentationAdvisor`로 RAG 조립 |
-| 프론트엔드 | Next.js | |
+| 언어 | Java 25, TypeScript | |
+| 백엔드 | Spring Boot 4.1.1, Spring AI 2.0.1, Spring Security | RAG 조립은 `RetrievalAugmentationAdvisor` (`spring-ai-vector-store-advisor`) |
+| 프론트엔드 | Next.js 16 (App Router), React 19, Tailwind CSS 4 | `src/` 구조, import 별칭 `@/*` |
 | RDB | MySQL | 사용자·과목·문서·문제·사용량 로그 |
 | 벡터DB | Qdrant | 단일 컬렉션 `study_chunks`, 1536차원, Cosine, HNSW |
-| 캐시 | Redis | 동일 질문 캐싱 + 시맨틱 캐싱 |
+| 캐시 | Redis | 동일 질문 캐싱 + 시맨틱 캐싱 — **미착수** (의존성·설정 없음) |
 | 문서 파싱 | Apache Tika / PDFBox | 저품질 페이지는 비전 모델로 재처리 |
 | 임베딩 | `text-embedding-3-small` (1536d) | 개발자 고정 키 |
 | 추론 LLM | Anthropic Claude / OpenAI GPT | **사용자 API 키**, 모델은 사용자가 선택 |
@@ -121,9 +122,10 @@ springdoc-openapi가 스펙을 생성합니다.
 
 ```
 SourceNote/
-├── backend/                  # (예정) Spring Boot — Java 21
+├── backend/                  # Spring Boot 4 · Java 25 (독립 Gradle 프로젝트)
+│   ├── build.gradle
 │   └── src/main/
-│       ├── java/.../sourcenote/
+│       ├── java/com/sourcenote/backend/
 │       │   ├── auth/         # OAuth 로그인, JWT 발급·검증
 │       │   ├── subject/      # 과목
 │       │   ├── document/     # PDF·Notion 수집, 파싱, 청킹, 임베딩
@@ -133,10 +135,17 @@ SourceNote/
 │       │   ├── settings/     # provider·API 키·모델 설정
 │       │   ├── usage/        # LlmUsageLog 기록·집계
 │       │   └── common/       # 설정, 예외, 암호화
-│       └── resources/application.yml
-├── frontend/                 # (예정) Next.js + TypeScript
+│       └── resources/
+│           ├── application.yml          # 공통 · profile: local
+│           ├── application-local.yml    # 개발 — DB·Qdrant localhost
+│           └── application-release.yml  # 오라클 — DB·Qdrant 컨테이너명
+├── frontend/                 # Next.js 16 · React 19 · Tailwind 4
+│   ├── src/app/              # App Router (layout.tsx, page.tsx)
+│   ├── public/
+│   └── package.json
 ├── infra/                    # (예정) docker-compose.yml, nginx.conf
 ├── .github/workflows/        # (예정) dev.yml, release.yml
+├── .env.example              # 환경변수 템플릿 (실제 .env는 gitignore)
 ├── docs/
 │   ├── ARCHITECTURE.md       # 파이프라인·요청 경로·내부 구조
 │   ├── API.md                # 엔드포인트 목록
@@ -148,13 +157,15 @@ SourceNote/
 └── README.md
 ```
 
+`backend/`의 하위 패키지와 `frontend/`의 화면은 아직 비어 있습니다 — 각각 `BackendApplication.java`+프로파일 설정, Next.js 초기 스캐폴드 상태입니다.
+
 ---
 
 ## 향후 계획
 
 **Phase 1 (MVP)** — 위 핵심 기능 4종 + 인증 + 사용량 집계.
 
-**Phase 2 — 에이전트 확장.** Spring AI 2.0 `ToolCallingAdvisor`(어드바이저 체인 기반 툴 콜링 루프)로 구현 예정. 진입 시점에 순서를 정합니다.
+**Phase 2 — 에이전트 확장.** 어드바이저 체인 기반 툴 콜링 루프(`ToolCallingAdvisor`)로 구현합니다. 이미 Spring AI 2.0.1을 쓰고 있어 버전 조건은 충족된 상태이고, 셋 중 무엇부터 할지는 진입 시점에 정합니다.
 
 - **A. 문제 생성 자체검증** — 생성된 문제를 원본 chunk와 대조 검증, 기준 미달이면 재생성 (Reflection 패턴)
 - **B. 학습 약점 분석 플래너** — 오답률 조회 → 약점 관련 chunk 재검색 → 맞춤 복습 문제·요약 생성 (가장 에이전트다운 기능)

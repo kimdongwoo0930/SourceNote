@@ -1,6 +1,7 @@
 # 배포 & 인프라
 
-> **상태: 설계 기준 (2026-09-21).** `docker-compose.yml`, `nginx.conf`, GitHub Actions 워크플로는 아직 커밋되지 않았습니다.
+> **상태 (2026-09-22).** 백엔드 스켈레톤과 프로파일별 설정(`application-local.yml`·`application-release.yml`)은 커밋됐습니다.
+> `docker-compose.yml`, `nginx.conf`, GitHub Actions 워크플로는 아직 없습니다.
 
 ---
 
@@ -61,7 +62,7 @@ services:
 
 `mem_limit`은 12GB 안에서 컨테이너 하나가 폭주해 서버 전체를 끌어내리는 것을 막기 위한 상한입니다.
 
-> ⚠️ **미반영**: 캐싱 설계에는 Redis가 들어가는데([COST_OPTIMIZATION.md](COST_OPTIMIZATION.md)) 위 서비스 목록에 아직 없습니다. 구현 시 `redis` 서비스를 internal 네트워크에 추가해야 합니다(예상 ~200MB).
+> ⚠️ **미반영**: 캐싱 설계에는 Redis가 들어가지만([COST_OPTIMIZATION.md](COST_OPTIMIZATION.md)) 위 서비스 목록에 없고, `build.gradle` 의존성과 yml 설정에도 아직 없습니다. 캐싱 착수 시 `redis` 서비스를 internal 네트워크에 추가하고(예상 ~200MB) `REDIS_HOST`·`REDIS_PORT`를 `.env`에 넣습니다.
 
 기본 명령:
 
@@ -71,6 +72,20 @@ docker compose ps
 docker compose logs -f backend
 docker compose down
 ```
+
+### 프로파일별 설정값
+
+환경변수가 아니라 프로파일 yml에 직접 박혀 있는 값들입니다. 바꾸려면 yml을 수정해야 합니다.
+
+| 항목 | `local` (맥미니·개발) | `release` (오라클) |
+|---|---|---|
+| DB URL | `jdbc:mysql://localhost:3306/sourcenote_dev` | `jdbc:mysql://mysql:3306/sourcenote` |
+| `ddl-auto` | `update` | `validate` |
+| Qdrant | `localhost:6334` | `qdrant:6334` |
+| 업로드 경로 | `./uploads` | `/data/uploads` |
+
+Qdrant 포트는 **6334(gRPC)** 입니다. HTTP API 포트 6333이 아닙니다.
+`release`의 `ddl-auto: validate`는 스키마를 자동 변경하지 않으므로, 운영 스키마 변경은 별도 마이그레이션으로 적용해야 합니다.
 
 ---
 
@@ -106,8 +121,10 @@ dev는 서버에서 바로 빌드하고, release는 **GHCR에 올린 이미지�
 |---|---|
 | 배포 | `DEV_SSH_HOST`, `DEV_SSH_KEY`, `PROD_SSH_HOST`, `PROD_SSH_KEY` |
 | 레지스트리 | `GHCR_TOKEN` |
-| 앱 | `OPENAI_API_KEY`, `JWT_SECRET`, `ENCRYPTION_KEY`, `MYSQL_ROOT_PASSWORD` |
+| 앱 | `EMBEDDING_API_KEY`, `JWT_SECRET`, `ENCRYPTION_SECRET`, `DB_USERNAME`, `DB_PASSWORD` |
 | OAuth | `GOOGLE_CLIENT_*`, `KAKAO_CLIENT_*`, `NOTION_CLIENT_*` |
+
+변수명과 발급처는 [`.env.example`](../.env.example)에 정리돼 있습니다. 애플리케이션이 실제로 읽는 변수는 이 11개뿐입니다.
 
 OAuth redirect URI는 dev/release가 다르므로 **제공사 콘솔에 두 환경 URI를 모두 등록**해야 합니다(Google·Kakao·Notion 각각).
 
@@ -117,7 +134,7 @@ OAuth redirect URI는 dev/release가 다르므로 **제공사 콘솔에 두 환�
 
 - [ ] Nginx 외에 호스트 포트를 무는 컨테이너가 없는지 (`docker compose ps`)
 - [ ] MySQL 볼륨과 Qdrant 볼륨이 영속 볼륨으로 마운트됐는지 (컨테이너 재생성 시 데이터 유실 방지)
-- [ ] PDF 원본 저장 경로(`Document.file_path`)가 볼륨 안에 있는지
+- [ ] 업로드 경로(`app.storage.upload-dir` = `/data/uploads`)가 영속 볼륨에 마운트됐는지 — `Document.file_path`가 이 경로를 가리킵니다
 - [ ] Cloudflare SSL 모드가 Full(strict)인지
 - [ ] 각 컨테이너 `mem_limit` 합이 12GB를 넘지 않는지 (Redis 추가 후 재확인)
 

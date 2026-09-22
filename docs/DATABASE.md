@@ -40,6 +40,17 @@ LlmUsageLog (id, user_id, subject_id, operation_type, model_name,
              cache_hit, cache_type, created_at)
 ```
 
+### 스키마 관리
+
+`ddl-auto`가 프로파일별로 다릅니다.
+
+| 프로파일 | DB | `ddl-auto` |
+|---|---|---|
+| `local` | `sourcenote_dev` | `update` — 엔티티 변경이 바로 반영 |
+| `release` | `sourcenote` | `validate` — 엔티티와 스키마가 다르면 기동 실패 |
+
+개발 중에는 `update`로 빠르게 돌리고, 운영에서는 `validate`로 자동 변경을 막습니다. 따라서 **운영 스키마 변경은 별도 마이그레이션으로 적용**해야 합니다(도구 미정).
+
 ### 관계
 
 ```
